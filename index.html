@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro QR Generator | 專業二維碼生成器</title>
+    
+    <script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* === FACE Theory: Creativity ===
+           設計說明：定義 CSS 變數以支援深色/淺色模式，使用現代化 Flex/Grid 佈局 
+        */
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #2d3436;
+            --primary-color: #6c5ce7;
+            --accent-color: #a29bfe;
+            --border-color: #dfe6e9;
+            --input-bg: #f1f2f6;
+            --shadow: 0 10px 30px rgba(0,0,0,0.05);
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1e272e;
+            --card-bg: #2d3436;
+            --text-color: #dfe6e9;
+            --primary-color: #a29bfe;
+            --border-color: #636e72;
+            --input-bg: #353b48;
+            --shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: var(--transition); min-height: 100vh; display: flex; flex-direction: column; }
+
+        /* Header & Theme Toggle */
+        header {
+            padding: 20px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .logo { font-weight: 700; font-size: 1.5rem; color: var(--primary-color); display: flex; align-items: center; gap: 10px; }
+        
+        .theme-switch {
+            cursor: pointer;
+            background: var(--input-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            user-select: none;
+        }
+
+        /* Main Layout */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px 5%;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; }
+        }
+
+        /* Controls Section */
+        .controls {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: var(--input-bg);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-color);
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        .tab-btn.active { background: var(--primary-color); color: white; }
+
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 0.9rem; font-weight: 500; color: var(--text-color); opacity: 0.8; }
+        
+        input[type="text"], input[type="number"], textarea, select {
+            padding: 12px;
+            background: var(--input-bg);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--text-color);
+            font-family: inherit;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary-color); }
+
+        .color-group { display: flex; gap: 10px; align-items: center; }
+        input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: none; }
+
+        .btn {
+            padding: 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary-color); color: var(--primary-color); }
+
+        /* Preview Section */
+        .preview-container {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 400px;
+        }
+
+        #canvas-wrapper {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white; /* QR code needs white/contrast bg usually */
+            border-radius: 12px;
+            border: 1px solid #eee;
+        }
+
+        .batch-status {
+            margin-top: 20px;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+        }
+        .log-item { padding: 5px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
+        .log-success { color: #00b894; }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        
+        /* File Input Styling */
+        .file-upload {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor: pointer;
+            background: var(--input-bg);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .file-upload input[type=file] {
+            position: absolute;
+            left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><path d="M3 14h7v7H3z"></path></svg>
+            Pro QR Generator
+        </div>
+        <div class="theme-switch" onclick="toggleTheme()">🌙 切換主題</div>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('single')">單一生成</button>
+                <button class="tab-btn" onclick="switchTab('batch')">批次生成 (Batch)</button>
+            </div>
+
+            <div id="single-mode">
+                <div class="form-group">
+                    <label>內容 / 網址</label>
+                    <input type="text" id="qr-content" placeholder="輸入 https://... 或任意文字" value="https://example.com">
+                </div>
+
+                <div class="form-group">
+                    <label>顏色自訂 (前景 / 背景)</label>
+                    <div class="color-group">
+                        <input type="color" id="color-dots" value="#000000">
+                        <input type="color" id="color-bg" value="#ffffff">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>嵌入 LOGO (選填)</label>
+                    <div class="file-upload">
+                        <span id="file-name">點擊上傳圖片...</span>
+                        <input type="file" id="logo-input" accept="image/*">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>點的形狀</label>
+                    <select id="dot-style">
+                        <option value="square">方形 (Square)</option>
+                        <option value="dots">圓點 (Dots)</option>
+                        <option value="rounded">圓角 (Rounded)</option>
+                        <option value="classy">優雅 (Classy)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="batch-mode" class="hidden">
+                <div class="form-group">
+                    <label>批次清單 (每行一條)</label>
+                    <textarea id="batch-content" rows="10" placeholder="https://site1.com&#10;https://site2.com&#10;專案A編號"></textarea>
+                </div>
+                <div class="form-group">
+                    <p style="font-size: 0.8rem; color: var(--text-color); opacity: 0.7;">注意：批次模式將使用「單一生成」中設定的顏色與 Logo 樣式。</p>
+                </div>
+            </div>
+
+            <button id="btn-download" class="btn" onclick="handleDownload()">下載 QR Code</button>
+        </section>
+
+        <section class="preview-container">
+            <div id="canvas-wrapper"></div>
+            <p id="preview-text" style="margin-top:10px; font-weight:600; color:var(--text-color)">即時預覽</p>
+            
+            <div id="batch-status" class="batch-status hidden"></div>
+        </section>
+    </main>
+
+    <script>
+        /* === FACE Theory: Explainability & Accuracy ===
+           程式邏輯說明：
+           1. 初始化 qr-code-styling 實例。
+           2. 監聽所有 Input 變化，Debounce 後更新預覽。
+           3. 實作單圖下載與 Zip 打包邏輯。
+        */
+
+        let qrCode;
+        let currentMode = 'single'; // 'single' or 'batch'
+        let uploadedLogo = null;
+
+        // 初始化
+        window.onload = () => {
+            initQR();
+            attachListeners();
+        };
+
+        function initQR() {
+            // 使用 qr-code-styling 建立實例
+            qrCode = new QRCodeStyling({
+                width: 300,
+                height: 300,
+                type: "svg",
+                data: "https://example.com",
+                image: "",
+                dotsOptions: { color: "#000000", type: "square" },
+                backgroundOptions: { color: "#ffffff" },
+                imageOptions: { crossOrigin: "anonymous", margin: 10 }
+            });
+            // 掛載到 DOM
+            qrCode.append(document.getElementById("canvas-wrapper"));
+        }
+
+        // 事件監聽與即時更新
+        function attachListeners() {
+            const inputs = ['qr-content', 'color-dots', 'color-bg', 'dot-style'];
+            inputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', updatePreview);
+            });
+
+            // Logo 處理
+            document.getElementById('logo-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        uploadedLogo = reader.result;
+                        document.getElementById('file-name').innerText = file.name;
+                        updatePreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // 更新預覽邏輯
+        function updatePreview() {
+            if(currentMode !== 'single') return;
+
+            const content = document.getElementById('qr-content').value || " ";
+            const colorDots = document.getElementById('color-dots').value;
+            const colorBg = document.getElementById('color-bg').value;
+            const dotStyle = document.getElementById('dot-style').value;
+
+            qrCode.update({
+                data: content,
+                image: uploadedLogo,
+                dotsOptions: { color: colorDots, type: dotStyle },
+                backgroundOptions: { color: colorBg }
+            });
+        }
+
+        // 下載處理 (功能分流)
+        async function handleDownload() {
+            const btn = document.getElementById('btn-download');
+            btn.disabled = true;
+            btn.innerText = "處理中...";
+
+            try {
+                if (currentMode === 'single') {
+                    // 單圖下載
+                    await qrCode.download({ name: "qr-code", extension: "png" });
+                } else {
+                    // 批次下載
+                    await generateBatch();
+                }
+            } catch (err) {
+                alert("發生錯誤: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "下載 QR Code";
+            }
+        }
+
+        // 批次生成核心邏輯
+        async function generateBatch() {
+            const rawText = document.getElementById('batch-content').value;
+            const lines = rawText.split('\n').filter(line => line.trim() !== '');
+            
+            if (lines.length === 0) {
+                alert("請輸入至少一行文字或網址！");
+                return;
+            }
+
+            const statusDiv = document.getElementById('batch-status');
+            statusDiv.classList.remove('hidden');
+            statusDiv.innerHTML = ''; // 清空舊紀錄
+
+            const zip = new JSZip();
+            const folder = zip.folder("qrcodes");
+
+            // 取得當前樣式設定
+            const colorDots = document.getElementById('color-dots').value;
+            const colorBg = document.getElementById('color-bg').value;
+            const dotStyle = document.getElementById('dot-style').value;
+
+            // 迴圈生成
+            for (let i = 0; i < lines.length; i++) {
+                const text = lines[i].trim();
+                
+                // 為了批次，我們需要建立臨時的 blob
+                // 注意：qr-code-styling 的 getRawData 是異步的
+                qrCode.update({
+                    data: text,
+                    image: uploadedLogo,
+                    dotsOptions: { color: colorDots, type: dotStyle },
+                    backgroundOptions: { color: colorBg }
+                });
+
+                const blob = await qrCode.getRawData("png");
+                const filename = `qr_${i+1}_${text.substring(0, 10).replace(/[^a-z0-9]/gi, '_')}.png`;
+                
+                folder.file(filename, blob);
+
+                // 更新 UI Log
+                const log = document.createElement('div');
+                log.className = 'log-item';
+                log.innerHTML = `<span>${text}</span> <span class="log-success">OK</span>`;
+                statusDiv.appendChild(log);
+            }
+
+            // 打包下載
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "qrcodes_batch.zip");
+            
+            // 恢復預覽
+            updatePreview(); 
+        }
+
+        // 介面切換邏輯
+        function switchTab(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (mode === 'single') {
+                document.getElementById('single-mode').classList.remove('hidden');
+                document.getElementById('batch-mode').classList.add('hidden');
+                document.getElementById('batch-status').classList.add('hidden');
+                document.getElementById('canvas-wrapper').classList.remove('hidden');
+                document.getElementById('preview-text').innerText = "即時預覽";
+                updatePreview();
+            } else {
+                document.getElementById('single-mode').classList.add('hidden');
+                document.getElementById('batch-mode').classList.remove('hidden');
+                // 批次模式時隱藏即時畫布，避免混淆，或顯示靜態圖示
+                document.getElementById('preview-text').innerText = "批次模式：點擊下載開始生成";
+            }
+        }
+
+        // 主題切換
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+        }
+    </script>
+</body>
+</html>
